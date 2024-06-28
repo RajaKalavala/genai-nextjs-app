@@ -10,6 +10,8 @@ import {
   SelectValue,
 } from './ui/select'
 import { Button } from './ui/button'
+import { Frame } from '@gptscript-ai/gptscript'
+import renderEventMessage from '@/lib/renderEventMessage'
 
 const storyPath = 'public/stories'
 
@@ -20,6 +22,47 @@ function StoryWriter() {
   const [runStarted, setRunStarted] = useState<boolean>(false)
   const [runFinished, setRunFinished] = useState<boolean | null>(null)
   const [currentTool, setCurrentTool] = useState<string>('')
+  const [events, setEvents] = useState<Frame[]>([])
+
+  async function handleStream(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    decoder: any
+  ) {
+    // Manage the stream from API...
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break // breaks out of the infinite loop!
+
+      //Explaination: The decoder is used to decode the Uint8Array into a string.
+      const chunk = decoder.decode(value, { stream: true })
+
+      //Explaination: We split the chunk into events by splitting it by the event: keyword.
+      const eventData = chunk
+        .split('\n\n')
+        .filter((line: any) => line.startsWith('event:'))
+        .map((line: any) => line.replace(/^event: /, ''))
+
+      //Explaination: We parse the JSON data and update the state accordingly.
+      eventData.forEach((data: any) => {
+        try {
+          const parsedData = JSON.parse(data)
+          if (parsedData.type === 'callProgress') {
+            setProgress(parsedData.output[parsedData.output.length - 1].content)
+            setCurrentTool(parsedData.tool?.description || '')
+          } else if (parsedData.type === 'callStart') {
+            setCurrentTool(parsedData.tool?.description || '')
+          } else if (parsedData.type === 'runFinish') {
+            setRunFinished(true)
+            setRunStarted(false)
+          } else {
+            setEvents((prevEvents) => [...prevEvents, parsedData])
+          }
+        } catch (error) {
+          console.error('Failed to parse JSON data:', error)
+        }
+      })
+    }
+  }
 
   async function runScript() {
     setRunStarted(true)
@@ -37,6 +80,10 @@ function StoryWriter() {
       // Handle stream from API
       //......
       console.log('Started streaming')
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      handleStream(reader, decoder)
       //......
     } else {
       setRunFinished(true)
@@ -102,6 +149,14 @@ function StoryWriter() {
           )}
 
           {/* Render Events... */}
+          <div className="space-y-5">
+            {events.map((event, index) => (
+              <div key={index}>
+                <span className="mr-5">{'>>'}</span>
+                {renderEventMessage(event)}
+              </div>
+            ))}
+          </div>
 
           {runStarted && (
             <div>
