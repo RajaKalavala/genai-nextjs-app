@@ -39,3 +39,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 
 - [ShadCN](https://ui.shadcn.com/docs/installation/next)
 - [Lucide Icons](https://lucide.dev/icons/)
+- [GPTScript Github](https://github.com/gptscript-ai/gptscript)
